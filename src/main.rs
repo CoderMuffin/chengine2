@@ -83,6 +83,15 @@ fn main() -> std::io::Result<()> {
     // board.exec_move(&Square::new("h1"), &Square::new("f5"));
     //let rng = &mut rand::thread_rng();
     board.display(perspective);
+    println!("{}", board.fen());
+    
+    // let mut pieces = [[None; 8]; 8];
+    // pieces[0][3] = Some(Piece::new('k', Color::Black));
+    // pieces[4][3] = Some(Piece::new('q', Color::Black));
+    // pieces[6][3] = Some(Piece::new('b', Color::White));
+    // pieces[7][3] = Some(Piece::new('r', Color::White));
+    // pieces[7][4] = Some(Piece::new('k', Color::White));
+    // println!("{}", Board::from(pieces, Square { x: 4, y: 7 }, Square { x: 3, y: 0 }).fen());
     loop {
         //println!("{:?}",pieces);
         // let mut moves = Vec::new();

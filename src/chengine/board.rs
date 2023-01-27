@@ -9,6 +9,7 @@ pub struct Board {
     curr_points: i32,
     king_white: Square,
     king_black: Square,
+    pub piece_count: u8
     // past_states: Vec<Board> //FOR DEBUG ONLY REMOVE ASAP
 }
 
@@ -58,6 +59,7 @@ impl Board {
             pieces: pieces,
             king_white: Square::new("e1").unwrap(),
             king_black: Square::new("e8").unwrap(),
+            piece_count: 32
             // past_states: Vec::new()
         }
     }
@@ -70,8 +72,45 @@ impl Board {
             pieces: pieces,
             king_white: king_white,
             king_black: king_black,
+            piece_count: pieces.into_iter().flatten().fold(0, |a, b| a + match b {
+                Some(_) => 1,
+                None => 0
+            })
             // past_states: Vec::new()
         }
+    }
+
+    pub fn fen(&self, who_to_move: Color) -> String {
+        let mut empty: u8 = 0;
+        let mut fen: String = String::new();
+        for y in (0..8).rev() {
+            for x in 0..8 {
+                if let Some(piece) = self.piece_at_xy(x, y) {
+                    if empty != 0 {
+                        fen += &empty.to_string();
+                        empty = 0;
+                    }
+                    fen.push(match piece.color {
+                        Color::White => piece.id.to_ascii_uppercase(),
+                        Color::Black => piece.id
+                    });
+                } else {
+                    empty += 1;
+                }
+            }
+            if empty != 0 {
+                fen += &empty.to_string();
+                empty = 0;
+            }
+            if y != 0 {
+                fen.push('/');
+            }
+        }
+        fen += "_" + match who_to_move {
+            Color::White => "w",
+            Color::Black => "b"
+        } + "_-_-_0_1";
+        fen
     }
 
     pub fn occupied(&self, square: &Square) -> bool {
@@ -116,7 +155,10 @@ impl Board {
         let y = to.y as usize;
         // self.past_states.push(self.clone());
         let (taken, mut points) = match self.pieces[y][x] {
-            Some(taken) => (Some(taken), taken.points),
+            Some(taken) => {
+                self.piece_count -= 1;
+                (Some(taken), taken.points)
+            },
             None => (None, 0),
         };
         self.pieces[y][x] = self.pieces[from.y as usize][from.x as usize];
@@ -152,6 +194,9 @@ impl Board {
         to: &Square,
         (points, moved, taken, promoted): (i32, Piece, Option<Piece>, bool),
     ) {
+        if taken.is_some() {
+            self.piece_count += 1;
+        }
         if promoted {
             self.pieces[from.y as usize][from.x as usize] = Some(Piece::new('p', moved.color))
         } else {
@@ -185,10 +230,6 @@ impl Board {
             }
         }
         result
-    }
-
-    pub fn get_pieces_iter(&self, color: Color) -> PieceIter {
-        PieceIter::new(self, color)
     }
 
     pub fn get_moves(&self, color: Color) -> Vec<(Square, Square)> {

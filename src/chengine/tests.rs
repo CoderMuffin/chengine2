@@ -32,6 +32,17 @@ fn fork() {
 }
 
 #[test]
+fn piece_count_from() {
+    let mut pieces = [[None; 8]; 8];
+    pieces[0][1] = Some(Piece::new('k', Color::White));
+    pieces[4][1] = Some(Piece::new('r', Color::White));
+    pieces[3][4] = Some(Piece::new('n', Color::Black));
+    pieces[5][5] = Some(Piece::new('k', Color::Black));
+    let board = Board::from(pieces, Square { x: 1, y: 0 }, Square { x: 5, y: 5 });
+    assert_eq!(board.piece_count, 4);
+}
+
+#[test]
 fn rook_endgame() {
     let mut pieces = [[None; 8]; 8];
     pieces[2][1] = Some(Piece::new('k', Color::White));

@@ -1,10 +1,24 @@
 use crate::chengine::*;
+use reqwest;
+use serde::Deserialize;
 
 pub struct Computer {
     pub following_opening: bool,
     seek_opening: usize,
     curr_opening: &'static Opening,
     color: Color,
+}
+
+#[derive(Deserialize, Debug)]
+struct EndgameResponse {
+    dtz: i32,
+    mainline: Vec<EndgameMove>
+}
+#[derive(Deserialize, Debug)]
+struct EndgameMove {
+    uci: String,
+    san: String,
+    dtz: i32
 }
 
 impl Computer {
@@ -15,6 +29,16 @@ impl Computer {
             curr_opening: opening,
             color: color,
         }
+    }
+
+    pub fn probe_tablebase(board: &Board) -> Result<(Square, Square), reqwest::Error> {
+        println!("{:?}", &board.fen());
+        let res = reqwest::blocking::get("http://tablebase.lichess.ovh/standard/mainline?fen=".to_string() + &board.fen())?.json::<EndgameResponse>()?;
+        println!("{:?}", res);
+        Ok((
+            Square::new(&res.mainline[0].uci[0..2]).unwrap(),
+            Square::new(&res.mainline[0].uci[2..4]).unwrap()
+        ))
     }
 
     // fn negamax(board: &Board, curr_color: Color, mut alpha: i32, beta: i32, depth: u8) -> i32 {
@@ -174,6 +198,9 @@ impl Computer {
             } else {
                 self.following_opening = false;
             }
+        }
+        if board.piece_count <= 7 {
+            return (f32::INFINITY, Self::probe_tablebase(board).expect("Communication error"));
         }
         match Self::negamax_with_move(board, self.color, f32::NEG_INFINITY, f32::INFINITY, depth) {
             (a, Some(b)) => (a, b),
