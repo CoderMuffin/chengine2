@@ -106,10 +106,12 @@ impl Board {
                 fen.push('/');
             }
         }
-        fen += "_" + match who_to_move {
+        fen += "_";
+        fen += match who_to_move {
             Color::White => "w",
             Color::Black => "b"
-        } + "_-_-_0_1";
+        };
+        fen += "_-_-_0_1";
         fen
     }
 
@@ -179,9 +181,21 @@ impl Board {
         moved.has_moved = true;
         if moved.id == 'k' {
             match moved.color {
-                Color::White => self.king_white = *to,
-                Color::Black => self.king_black = *to,
+                Color::White => {
+                    self.king_white = *to;
+                    self.castle_white = false;
+                }
+                Color::Black => {
+                    self.king_black = *to;
+                    self.castle_black = false;
+                }
             }
+        } else if moved.id == 'p' {
+            let incr = (from.y as i32 - to.y as i32).abs();
+            moved.points += incr;
+            points += incr;
+        } else if moved.id == 'n' {
+            
         }
         points *= if moved.color == Color::White { 1 } else { -1 };
         self.curr_points += points;

@@ -11,14 +11,11 @@ pub struct Computer {
 
 #[derive(Deserialize, Debug)]
 struct EndgameResponse {
-    dtz: i32,
-    mainline: Vec<EndgameMove>
+    moves: Vec<EndgameMove>
 }
 #[derive(Deserialize, Debug)]
 struct EndgameMove {
-    uci: String,
-    san: String,
-    dtz: i32
+    uci: String
 }
 
 impl Computer {
@@ -31,62 +28,17 @@ impl Computer {
         }
     }
 
-    pub fn probe_tablebase(board: &Board) -> Result<(Square, Square), reqwest::Error> {
-        println!("{:?}", &board.fen());
-        let res = reqwest::blocking::get("http://tablebase.lichess.ovh/standard/mainline?fen=".to_string() + &board.fen())?.json::<EndgameResponse>()?;
+    pub fn probe_tablebase(&self, board: &Board) -> Result<(Square, Square), reqwest::Error> {
+        let req = "http://tablebase.lichess.ovh/standard?fen=".to_string() + &board.fen(self.color);
+        println!("{:?}", req);
+        let res = reqwest::blocking::get(req)?.json::<EndgameResponse>()?;
         println!("{:?}", res);
         Ok((
-            Square::new(&res.mainline[0].uci[0..2]).unwrap(),
-            Square::new(&res.mainline[0].uci[2..4]).unwrap()
+            Square::new(&res.moves[0].uci[0..2]).unwrap(),
+            Square::new(&res.moves[0].uci[2..4]).unwrap()
         ))
     }
-
-    // fn negamax(board: &Board, curr_color: Color, mut alpha: i32, beta: i32, depth: u8) -> i32 {
-    //     if depth == 0 {
-    //         return board.eval(curr_color);
-    //     }
-    //     let mut max = i32::MIN + 1; // +1 to avoid overflow on negate
-    //     for piece in board.get_pieces_iter(curr_color) {
-    //         for square in piece.1.get_moves(board, piece.0) {
-    //             let mut board_copy = board.clone();
-    //             board_copy.exec_move(&piece.0, &square);
-    //             let score = -Self::negamax(&board_copy, !curr_color, -beta, -alpha, depth - 1);
-    //             if score > max {
-    //                 max = score;
-    //             }
-    //             if score > alpha {
-    //                 alpha = score;
-    //                 if alpha >= beta {
-    //                    break;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return max;
-    // }
-
-    // fn negamax(board: &Board, curr_color: Color, mut alpha: i32, beta: i32, depth: u8) -> i32 {
-    //     if depth == 0 {
-    //         return board.eval(curr_color);
-    //     }
-    //     let mut max = i32::MIN + 1; // +1 to avoid overflow on negate
-    //     for (from, to) in board.get_moves(curr_color) {
-    //         let mut board_copy = board.clone();
-    //         board_copy.exec_move(&from, &to);
-    //         let score = -Self::negamax(&board_copy, !curr_color, -beta, -alpha, depth - 1);
-    //         if score > max {
-    //             max = score;
-    //         }
-    //         if score > alpha {
-    //             alpha = score;
-    //             if alpha >= beta {
-    //                break;
-    //             }
-    //         }
-    //     }
-    //     return max;
-    // }
-
+    
     fn negamax(board: &mut Board, curr_color: Color, mut alpha: f32, beta: f32, depth: u8) -> f32 {
         if depth == 0 {
             return board.eval(curr_color);
@@ -200,7 +152,7 @@ impl Computer {
             }
         }
         if board.piece_count <= 7 {
-            return (f32::INFINITY, Self::probe_tablebase(board).expect("Communication error"));
+            return (f32::INFINITY, self.probe_tablebase(board).expect("Communication error"));
         }
         match Self::negamax_with_move(board, self.color, f32::NEG_INFINITY, f32::INFINITY, depth) {
             (a, Some(b)) => (a, b),

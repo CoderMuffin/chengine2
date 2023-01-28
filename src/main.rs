@@ -64,6 +64,14 @@ fn board_damage_minification() -> Board {
     Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
 }
 
+fn board_rook_checkmate() -> Board {
+    let mut pieces = [[None; 8]; 8];
+    pieces[7][7] = Some(Piece::new('k', Color::White));
+    pieces[2][1] = Some(Piece::new('k', Color::Black));
+    pieces[1][2] = Some(Piece::new('r', Color::White));
+    Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
+}
+
 fn main() -> std::io::Result<()> {
     let depth = 6;
     let mut board = Board::new();
@@ -83,7 +91,7 @@ fn main() -> std::io::Result<()> {
     // board.exec_move(&Square::new("h1"), &Square::new("f5"));
     //let rng = &mut rand::thread_rng();
     board.display(perspective);
-    println!("{}", board.fen());
+    println!("{}", board.fen(Color::White));
     
     // let mut pieces = [[None; 8]; 8];
     // pieces[0][3] = Some(Piece::new('k', Color::Black));

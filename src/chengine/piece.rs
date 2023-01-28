@@ -16,11 +16,11 @@ impl Piece {
             has_moved: false,
             points: match id {
                 'k' => 99999,
-                'q' => 85,
-                'r' => 50,
-                'b' => 35,
-                'n' => 30,
-                'p' => 10,
+                'q' => 850,
+                'r' => 500,
+                'b' => 350,
+                'n' => 300,
+                'p' => 100,
                 _ => panic!("Invalid piece '{}'", id),
             },
         }
