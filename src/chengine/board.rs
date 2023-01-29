@@ -2,6 +2,35 @@ use crate::chengine::*;
 use std::fmt;
 
 #[derive(Clone)]
+pub struct CastleInfo {
+    pub kingside: bool,
+    pub queenside: bool
+}
+
+impl CastleInfo {
+    fn new(kingside: bool, queenside: bool) -> Self {
+        Self {
+            kingside: kingside,
+            queenside: queenside
+        }
+    }
+
+    fn both() -> Self {
+        Self {
+            kingside: true,
+            queenside: true
+        }
+    }
+
+    fn neither() -> Self {
+        Self {
+            kingside: false,
+            queenside: false
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Board {
     pieces: [[Option<Piece>; 8]; 8],
     pub highlight_move: (Square, Square),
@@ -9,7 +38,9 @@ pub struct Board {
     curr_points: i32,
     king_white: Square,
     king_black: Square,
-    pub piece_count: u8
+    pub piece_count: u8,
+    pub castle_white: CastleInfo,
+    pub castle_black: CastleInfo
     // past_states: Vec<Board> //FOR DEBUG ONLY REMOVE ASAP
 }
 
@@ -59,7 +90,9 @@ impl Board {
             pieces: pieces,
             king_white: Square::new("e1").unwrap(),
             king_black: Square::new("e8").unwrap(),
-            piece_count: 32
+            piece_count: 32,
+            castle_white: CastleInfo::both(),
+            castle_black: CastleInfo::both()
             // past_states: Vec::new()
         }
     }
@@ -72,6 +105,8 @@ impl Board {
             pieces: pieces,
             king_white: king_white,
             king_black: king_black,
+            castle_white: CastleInfo::neither(),
+            castle_black: CastleInfo::neither(),
             piece_count: pieces.into_iter().flatten().fold(0, |a, b| a + match b {
                 Some(_) => 1,
                 None => 0
@@ -183,11 +218,11 @@ impl Board {
             match moved.color {
                 Color::White => {
                     self.king_white = *to;
-                    self.castle_white = false;
+                    self.castle_white = CastleInfo::neither();
                 }
                 Color::Black => {
                     self.king_black = *to;
-                    self.castle_black = false;
+                    self.castle_black = CastleInfo::neither();
                 }
             }
         } else if moved.id == 'p' {

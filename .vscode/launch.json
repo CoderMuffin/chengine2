@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "name": "Launch",
+            "preLaunchTask": "rust: cargo run",
+            "type": "node",
+            "request": "launch"
+        }
+    ]
+}
