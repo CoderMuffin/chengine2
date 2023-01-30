@@ -50,7 +50,7 @@ impl Piece {
                 }
             }
         } else if self.id == 'n' {
-            for &square in &[
+            for square in [
                 (1, 2),
                 (-1, 2),
                 (1, -2),
@@ -67,7 +67,7 @@ impl Piece {
                 }
             }
         } else if self.id == 'b' {
-            for signs in &[(1i8, 1i8), (1, -1), (-1, -1), (-1, 1)] {
+            for signs in [(1i8, 1i8), (1, -1), (-1, -1), (-1, 1)] {
                 for xy in 1i8.. {
                     if let Some(dest) = from + (xy * signs.0, xy * signs.1) {
                         if !board.occupied(&dest) {
@@ -84,7 +84,7 @@ impl Piece {
                 }
             }
         } else if self.id == 'r' {
-            for signs in &[(1i8, 0i8), (-1, 0), (0, -1), (0, 1)] {
+            for signs in [(1i8, 0i8), (-1, 0), (0, -1), (0, 1)] {
                 for xy in 1i8.. {
                     if let Some(dest) = from + (xy * signs.0, xy * signs.1) {
                         if !board.occupied(&dest) {
@@ -101,7 +101,7 @@ impl Piece {
                 }
             }
         } else if self.id == 'q' {
-            for signs in &[
+            for signs in [
                 (1i8, 0i8),
                 (-1, 0),
                 (0, -1),
@@ -127,7 +127,7 @@ impl Piece {
                 }
             }
         } else if self.id == 'k' {
-            for &dir in &[
+            for dir in [
                 (1i8, 0i8),
                 (-1, 0),
                 (0, -1),
@@ -141,6 +141,34 @@ impl Piece {
                     if !board.is_color(&dest, self.color) {
                         moves.push((from, dest));
                     }
+                }
+            }
+
+            let castle_info = board.can_castle(self.color);
+            if castle_info.kingside {
+                let mut can_castle = true;
+                let dest = (from + (-2, 0)).unwrap();
+                for sq in [(from + (-1, 0)).unwrap(), dest] {
+                    if board.occupied(&sq) || Piece::in_check(board, sq, self.color) {
+                        can_castle = false;
+                        break;
+                    }
+                }
+                if can_castle {
+                    moves.push((from, dest));
+                }
+            }
+            if castle_info.queenside {
+                let mut can_castle = true;
+                let dest = (from + (2, 0)).unwrap();
+                for sq in [(from + (1, 0)).unwrap(), dest] {
+                    if board.occupied(&sq) || Piece::in_check(board, sq, self.color) {
+                        can_castle = false;
+                        break;
+                    }
+                }
+                if can_castle {
+                    moves.push((from, dest));
                 }
             }
 
@@ -160,7 +188,7 @@ impl Piece {
         }
     }
 
-    pub fn in_check(&self, board: &Board, square: Square) -> bool {
+    pub fn in_check(board: &Board, square: Square, color: Color) -> bool {
         //assumes it is a king for efficiency
         for signs in &[
             (1i8, 0i8, 'r'),
@@ -175,9 +203,9 @@ impl Piece {
             for xy in 1i8.. {
                 if let Some(dest) = square + (xy * signs.0, xy * signs.1) {
                     if let Some(piece) = board.piece_at(&dest) {
-                        if (piece.id == 'q' || piece.id == signs.2) && piece.color == !self.color {
+                        if (piece.id == 'q' || piece.id == signs.2) && piece.color == !color {
                             return true;
-                        } else if piece.id == 'k' && xy == 1 && piece.color == !self.color {
+                        } else if piece.id == 'k' && xy == 1 && piece.color == !color {
                             return true;
                         } else {
                             break;
@@ -200,13 +228,13 @@ impl Piece {
         ] {
             if let Some(dest) = square + jump {
                 if let Some(piece) = board.piece_at(&dest) {
-                    if piece.id == 'n' && piece.color != self.color {
+                    if piece.id == 'n' && piece.color != color {
                         return true;
                     }
                 }
             }
         }
-        if self.color == Color::Black {
+        if color == Color::Black {
             if let Some(dest) = square + (-1, -1) {
                 if let Some(piece) = board.piece_at(&dest) {
                     if piece.id == 'p' && piece.color == Color::White {
@@ -221,7 +249,7 @@ impl Piece {
                     }
                 }
             }
-        } else if self.color == Color::White {
+        } else if color == Color::White {
             if let Some(dest) = square + (-1, 1) {
                 if let Some(piece) = board.piece_at(&dest) {
                     if piece.id == 'p' && piece.color == Color::Black {

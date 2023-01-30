@@ -8,21 +8,21 @@ pub struct CastleInfo {
 }
 
 impl CastleInfo {
-    fn new(kingside: bool, queenside: bool) -> Self {
+    pub fn new(kingside: bool, queenside: bool) -> Self {
         Self {
             kingside: kingside,
             queenside: queenside
         }
     }
 
-    fn both() -> Self {
+    pub fn both() -> Self {
         Self {
             kingside: true,
             queenside: true
         }
     }
 
-    fn neither() -> Self {
+    pub fn neither() -> Self {
         Self {
             kingside: false,
             queenside: false
@@ -39,8 +39,8 @@ pub struct Board {
     king_white: Square,
     king_black: Square,
     pub piece_count: u8,
-    pub castle_white: CastleInfo,
-    pub castle_black: CastleInfo
+    castle_white: CastleInfo,
+    castle_black: CastleInfo
     // past_states: Vec<Board> //FOR DEBUG ONLY REMOVE ASAP
 }
 
@@ -176,7 +176,7 @@ impl Board {
         };
         // self.piece_at(&sq).unwrap().in_check(&self, sq)
         match self.piece_at(&sq) {
-            Some(piece) => piece.in_check(&self, sq),
+            Some(piece) => Piece::in_check(&self, sq, color),
             None => {
                 // for state in &self.past_states {
                 //     println!("{}", state);
@@ -229,8 +229,25 @@ impl Board {
             let incr = (from.y as i32 - to.y as i32).abs();
             moved.points += incr;
             points += incr;
-        } else if moved.id == 'n' {
-            
+        } else if moved.id == 'r' {
+            if x == 0 || x == 7 {
+                match moved.color {
+                    Color::White => {
+                        if x == 0 {
+                            self.castle_white.queenside = false;
+                        } else {
+                            self.castle_white.kingside = false;
+                        }
+                    },
+                    Color::Black => {
+                        if x == 0 {
+                            self.castle_white.queenside = false;
+                        } else {
+                            self.castle_white.kingside = false;
+                        }
+                    }
+                }
+            }
         }
         points *= if moved.color == Color::White { 1 } else { -1 };
         self.curr_points += points;
@@ -294,6 +311,13 @@ impl Board {
             result
         });
         moves
+    }
+
+    pub fn can_castle(&self, color: Color) -> &CastleInfo {
+        match color {
+            Color::White => &self.castle_white,
+            Color::Black => &self.castle_black
+        }
     }
 
     pub fn is_in_checkmate(&self, color: Color) -> bool {

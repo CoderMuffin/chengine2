@@ -7,7 +7,7 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"label": "rust: cargo run",
+			"label": "rustc",
 			"group": {
 				"kind": "build",
 				"isDefault": true
