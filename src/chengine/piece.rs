@@ -144,31 +144,33 @@ impl Piece {
                 }
             }
 
-            let castle_info = board.can_castle(self.color);
-            if castle_info.kingside {
-                let mut can_castle = true;
-                let dest = (from + (-2, 0)).unwrap();
-                for sq in [(from + (-1, 0)).unwrap(), dest] {
-                    if board.occupied(&sq) || Piece::in_check(board, sq, self.color) {
-                        can_castle = false;
-                        break;
+            if !Piece::in_check(board, from, self.color) {
+                let castle_info = board.can_castle(self.color);
+                if castle_info.kingside {
+                    let mut can_castle = true;
+                    let dest = (from + (-2, 0)).unwrap();
+                    for sq in [(from + (-1, 0)).unwrap(), dest] {
+                        if board.occupied(&sq) || Piece::in_check(board, sq, self.color) {
+                            can_castle = false;
+                            break;
+                        }
+                    }
+                    if can_castle {
+                        moves.push((from, dest));
                     }
                 }
-                if can_castle {
-                    moves.push((from, dest));
-                }
-            }
-            if castle_info.queenside {
-                let mut can_castle = true;
-                let dest = (from + (2, 0)).unwrap();
-                for sq in [(from + (1, 0)).unwrap(), dest] {
-                    if board.occupied(&sq) || Piece::in_check(board, sq, self.color) {
-                        can_castle = false;
-                        break;
+                if castle_info.queenside {
+                    let mut can_castle = true;
+                    let dest = (from + (2, 0)).unwrap();
+                    for sq in [(from + (1, 0)).unwrap(), dest] {
+                        if board.occupied(&sq) || Piece::in_check(board, sq, self.color) {
+                            can_castle = false;
+                            break;
+                        }
                     }
-                }
-                if can_castle {
-                    moves.push((from, dest));
+                    if can_castle {
+                        moves.push((from, dest));
+                    }
                 }
             }
 
