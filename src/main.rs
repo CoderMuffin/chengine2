@@ -3,6 +3,8 @@
 mod chengine;
 use crate::chengine::*;
 
+static PERSPECTIVE: Color = Color::Black;
+
 fn input_move(
     board: &mut Board,
     color: Color,
@@ -17,7 +19,7 @@ fn input_move(
         if from.starts_with("?") {
             if let Some(sq) = Square::new(&from[1..]) {
                 board.highlight_piece = Some(sq);
-                println!("{}", board);
+                board.display(PERSPECTIVE);
                 continue;
             } else {
                 println!("Cannot get moves for {}", &from[1..]);
@@ -30,15 +32,19 @@ fn input_move(
         let (fromsq, tosq) = match (Square::new(&from), Square::new(&to)) {
             (Some(a), Some(b)) => (a, b),
             _ => {
-                println!("Invalid\n{}", board);
+                println!("Invalid");
+                board.display(PERSPECTIVE);
                 continue;
             }
         };
 
-        if board.get_moves(color).iter().any(|x| *x == (fromsq, tosq)) {
+        let mut moves = board.get_moves(color);
+        board.filter_checks(&mut moves, color);
+        if moves.iter().any(|x| *x == (fromsq, tosq)) {
             return Ok((fromsq, tosq));
         }
-        println!("Invalid\n{}", board);
+        println!("Invalid");
+        board.display(PERSPECTIVE);
     }
 }
 
@@ -54,33 +60,32 @@ impl StdinExtension for std::io::Stdin {
     }
 }
 
-fn board_damage_minification() -> Board {
-    let mut pieces = [[None; 8]; 8];
-    pieces[7][7] = Some(Piece::new('k', Color::White));
-    pieces[2][1] = Some(Piece::new('k', Color::Black));
-    pieces[1][1] = Some(Piece::new('p', Color::Black));
-    pieces[1][2] = Some(Piece::new('r', Color::White));
-    pieces[2][2] = Some(Piece::new('n', Color::White));
-    Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
-}
+// fn board_damage_minification() -> Board {
+//     let mut pieces = [[None; 8]; 8];
+//     pieces[7][7] = Some(Piece::new('k', Color::White));
+//     pieces[2][1] = Some(Piece::new('k', Color::Black));
+//     pieces[1][1] = Some(Piece::new('p', Color::Black));
+//     pieces[1][2] = Some(Piece::new('r', Color::White));
+//     pieces[2][2] = Some(Piece::new('n', Color::White));
+//     Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
+// }
 
-fn board_rook_checkmate() -> Board {
-    let mut pieces = [[None; 8]; 8];
-    pieces[7][7] = Some(Piece::new('k', Color::White));
-    pieces[2][1] = Some(Piece::new('k', Color::Black));
-    pieces[1][2] = Some(Piece::new('r', Color::White));
-    Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
-}
+// fn board_rook_checkmate() -> Board {
+//     let mut pieces = [[None; 8]; 8];
+//     pieces[7][7] = Some(Piece::new('k', Color::White));
+//     pieces[2][1] = Some(Piece::new('k', Color::Black));
+//     pieces[1][2] = Some(Piece::new('r', Color::White));
+//     Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
+// }
 
 fn main() -> std::io::Result<()> {
-    let depth = 6;
+    let depth = 5;
     let mut board = Board::new();
     let mut current_color = Color::White;
-    let perspective = Color::Black;
     let stdin = std::io::stdin();
     let mut computer1 = Computer::new(Color::White, &OPENING_BOOK);
     let mut computer2 = Computer::new(Color::Black, &OPENING_BOOK);
-    computer1.following_opening = false;
+    computer1.following_opening = true;
     computer2.following_opening = false;
     //computer.following_opening = false;
     let mut last_move = None;
@@ -90,9 +95,9 @@ fn main() -> std::io::Result<()> {
     // board.exec_move(&Square::new("d1"), &Square::new("d4"));
     // board.exec_move(&Square::new("h1"), &Square::new("f5"));
     //let rng = &mut rand::thread_rng();
-    board.display(perspective);
-    println!("{}", board.fen(Color::White));
-    
+    board.display(PERSPECTIVE);
+    //println!("{}", board.fen(Color::White));
+
     // let mut pieces = [[None; 8]; 8];
     // pieces[0][3] = Some(Piece::new('k', Color::Black));
     // pieces[4][3] = Some(Piece::new('q', Color::Black));
@@ -143,7 +148,7 @@ fn main() -> std::io::Result<()> {
             board.king_in_check(Color::Black),
             computer1.following_opening
         );
-        board.display(perspective);
+        board.display(PERSPECTIVE);
         if board.eval(Color::White) == CHECKMATE {
             println!("White wins");
             break;

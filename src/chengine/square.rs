@@ -21,6 +21,13 @@ impl Square {
             y: range_check(str_iter.next()? as u32 - 49)?,
         })
     }
+    pub fn disp(&self) -> String {
+        format!(
+            "{}{}",
+            &['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'][self.x as usize],
+            self.y + 1
+        )
+    }
 }
 
 impl std::convert::Into<Square> for (u8, u8) {

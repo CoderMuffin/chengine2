@@ -1,6 +1,7 @@
 use crate::chengine::*;
 use reqwest;
 use serde::Deserialize;
+use serde_json;
 
 pub struct Computer {
     pub following_opening: bool,
@@ -11,11 +12,11 @@ pub struct Computer {
 
 #[derive(Deserialize, Debug)]
 struct EndgameResponse {
-    moves: Vec<EndgameMove>
+    moves: Vec<EndgameMove>,
 }
 #[derive(Deserialize, Debug)]
 struct EndgameMove {
-    uci: String
+    uci: String,
 }
 
 impl Computer {
@@ -28,37 +29,83 @@ impl Computer {
         }
     }
 
-    pub fn probe_tablebase(&self, board: &Board) -> Result<(Square, Square), reqwest::Error> {
+    pub fn probe_tablebase(&self, board: &Board) -> Result<(Square, Square), &str> {
         let req = "http://tablebase.lichess.ovh/standard?fen=".to_string() + &board.fen(self.color);
         println!("{:?}", req);
-        let res = reqwest::blocking::get(req)?.json::<EndgameResponse>()?;
-        println!("{:?}", res);
-        Ok((
-            Square::new(&res.moves[0].uci[0..2]).unwrap(),
-            Square::new(&res.moves[0].uci[2..4]).unwrap()
-        ))
-    }
-    
-    fn negamax(board: &mut Board, curr_color: Color, mut alpha: f32, beta: f32, depth: u8) -> f32 {
-        if depth == 0 {
-            return board.eval(curr_color);
+        let res_text = match reqwest::blocking::get(req) {
+            Ok(r) => match r.text() {
+                Ok(r2) => r2,
+                Err(..) => return Err("Couldn't get text from response"),
+            },
+            Err(..) => return Err("GET request failed"),
+        };
+        match serde_json::from_str::<EndgameResponse>(&res_text) {
+            Ok(endgame_res) => Ok((
+                Square::new(&endgame_res.moves[0].uci[0..2]).unwrap(),
+                Square::new(&endgame_res.moves[0].uci[2..4]).unwrap(),
+            )),
+            Err(..) => {
+                println!("JSON parse error: response '{}'", res_text);
+                Err("JSON parse error")
+            }
         }
-        let mut max = f32::NEG_INFINITY; // +1 to avoid overflow on negate
+    }
+
+    fn quiescence(board: &mut Board, curr_color: Color, mut alpha: f32, beta: f32) -> f32 {
+        let stand_pat = board.eval(curr_color);
+        if stand_pat >= beta {
+            return beta;
+        }
+        if alpha < stand_pat {
+            alpha = stand_pat;
+        }
         for (from, to) in board.get_moves(curr_color) {
+            if !board.occupied(&to) { //should be faster than retain, maybe bench this?
+                continue;
+            }
             let move_data = board.exec_move(&from, &to);
-            let score = -Self::negamax(board, !curr_color, -beta, -alpha, depth - 1);
+            let score = -Self::quiescence(board, !curr_color, -beta, -alpha);
             board.unexec_move(&from, &to, move_data);
-            if score > max {
-                max = score;
+    
+            if score >= beta {
+                return beta;
             }
             if score > alpha {
-                alpha = score;
+               alpha = score;
+            }
+        }
+        return alpha;
+    }
+
+    fn move_sort(board: &Board, a: &(Square, Square), b: &(Square, Square)) -> std::cmp::Ordering {
+        board.square_value(&b.1).partial_cmp(&board.square_value(&a.1)).unwrap()
+    }
+
+    fn negamax(board: &mut Board, curr_color: Color, mut alpha: f32, beta: f32, depth: u8) -> f32 {
+        if depth == 0 {
+            return Self::quiescence(board, curr_color, alpha, beta);
+        }
+        let mut best = f32::NEG_INFINITY; // +1 to avoid overflow on negate
+        let mut moves = board.get_moves(curr_color);
+        moves.sort_by(|a, b| Self::move_sort(board, a, b));
+        for (from, to) in moves {
+            let move_data = board.exec_move(&from, &to);
+            let score = -Self::negamax(board, !curr_color, -beta, -alpha, depth - 1);
+
+            if score > best {
+                best = score;
+            }
+            
+            //this has to come before the break as the board is shared state
+            board.unexec_move(&from, &to, move_data); 
+            if best > alpha {
+                alpha = best;
                 if alpha >= beta {
                     break;
                 }
             }
         }
-        return max;
+        return best;
     }
 
     fn negamax_with_move(
@@ -68,23 +115,27 @@ impl Computer {
         beta: f32,
         depth: u8,
     ) -> (f32, Option<(Square, Square)>) {
-        let mut max = (f32::NEG_INFINITY, None);
-        for (from, to) in board.get_moves(curr_color) {
+        let mut best = (f32::NEG_INFINITY, None);
+        let mut moves = board.get_moves(curr_color);
+        moves.sort_by(|a, b| Self::move_sort(board, a, b));
+        for (from, to) in moves {
             let mut board_copy = board.clone();
             board_copy.exec_move(&from, &to);
             let score = -Self::negamax(&mut board_copy, !curr_color, -beta, -alpha, depth - 1);
-            //println!("Possible move {} to {} earns min of (+adv, -dis) {}", piece.0, square, score);
-            if score > max.0 {
-                max = (score, Some((from, to)));
+            //score = -score;
+            //board.unexec_move(&from, &to, move_data);
+            if score > best.0 {
+                best = (score, Some((from, to)));
             }
-            if score > alpha {
-                alpha = score;
+            
+            if best.0 > alpha {
+                alpha = best.0;
                 if alpha >= beta {
                     break;
                 }
             }
         }
-        return max;
+        return best;
     }
 
     pub fn get_next_from_opening(
@@ -152,10 +203,17 @@ impl Computer {
             }
         }
         if board.piece_count <= 7 {
-            return (f32::INFINITY, self.probe_tablebase(board).expect("Communication error"));
+            return (
+                f32::INFINITY,
+                self.probe_tablebase(board).expect("Communication error"),
+            );
         }
         match Self::negamax_with_move(board, self.color, f32::NEG_INFINITY, f32::INFINITY, depth) {
-            (a, Some(b)) => (a, b),
+            (a, Some(b)) => {
+                //let b0 = b[0];
+                //println!("{} {:?}", a, b.into_iter().map(|x| (x.0.disp(), x.1.disp())).collect::<Vec<_>>());
+                (a, b)
+            },
             _ => panic!(),
         }
     }
