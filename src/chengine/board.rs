@@ -45,54 +45,7 @@ pub struct Board {
 
 impl Board {
     pub fn new() -> Board {
-        let mut pieces = [[None; 8]; 8];
-        pieces[1][0] = Some(Piece::new('p', Color::White));
-        pieces[1][1] = Some(Piece::new('p', Color::White));
-        pieces[1][2] = Some(Piece::new('p', Color::White));
-        pieces[1][3] = Some(Piece::new('p', Color::White));
-        pieces[1][4] = Some(Piece::new('p', Color::White));
-        pieces[1][5] = Some(Piece::new('p', Color::White));
-        pieces[1][6] = Some(Piece::new('p', Color::White));
-        pieces[1][7] = Some(Piece::new('p', Color::White));
-
-        pieces[0][0] = Some(Piece::new('r', Color::White));
-        pieces[0][1] = Some(Piece::new('n', Color::White));
-        pieces[0][2] = Some(Piece::new('b', Color::White));
-        pieces[0][3] = Some(Piece::new('q', Color::White));
-        pieces[0][4] = Some(Piece::new('k', Color::White));
-        pieces[0][5] = Some(Piece::new('b', Color::White));
-        pieces[0][6] = Some(Piece::new('n', Color::White));
-        pieces[0][7] = Some(Piece::new('r', Color::White));
-
-        pieces[6][0] = Some(Piece::new('p', Color::Black));
-        pieces[6][1] = Some(Piece::new('p', Color::Black));
-        pieces[6][2] = Some(Piece::new('p', Color::Black));
-        pieces[6][3] = Some(Piece::new('p', Color::Black));
-        pieces[6][4] = Some(Piece::new('p', Color::Black));
-        pieces[6][5] = Some(Piece::new('p', Color::Black));
-        pieces[6][6] = Some(Piece::new('p', Color::Black));
-        pieces[6][7] = Some(Piece::new('p', Color::Black));
-
-        pieces[7][0] = Some(Piece::new('r', Color::Black));
-        pieces[7][1] = Some(Piece::new('n', Color::Black));
-        pieces[7][2] = Some(Piece::new('b', Color::Black));
-        pieces[7][3] = Some(Piece::new('q', Color::Black));
-        pieces[7][4] = Some(Piece::new('k', Color::Black));
-        pieces[7][5] = Some(Piece::new('b', Color::Black));
-        pieces[7][6] = Some(Piece::new('n', Color::Black));
-        pieces[7][7] = Some(Piece::new('r', Color::Black));
-
-        Board {
-            highlight_move: (Square { x: 16, y: 16 }, Square { x: 16, y: 16 }),
-            highlight_piece: None,
-            curr_points: 0,
-            pieces: pieces,
-            king_white: Square::new("e1").unwrap(),
-            king_black: Square::new("e8").unwrap(),
-            piece_count: 32,
-            castle_white: CastleInfo::both(),
-            castle_black: CastleInfo::both(), // past_states: Vec::new()
-        }
+        Self::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
     }
 
     #[allow(dead_code)]
@@ -115,7 +68,6 @@ impl Board {
         }
     }
 
-    #[allow(dead_code)]
     pub fn from_fen(fen: &str) -> Self {
         let mut pieces = [[None; 8]; 8];
         let mut piece_count = 0;
@@ -270,12 +222,9 @@ impl Board {
             None => (None, 0),
         };
 
-        // println!("{} {:?} {:?} {:?} {:?}", self, fy, fx, ty, tx);
-        //move piece
+        //get piece (move after modifications made)
         let mut moved = self.pieces[fy][fx].expect("no piece to move!");
         moved.has_moved = true;
-        self.pieces[ty][tx] = Some(moved);
-        self.pieces[fy][fx] = None;
 
         //test for promotion
         let mut promoted = false;
@@ -324,8 +273,19 @@ impl Board {
             }
         } else if moved.id == 'p' {
             let incr = (fy as i32 - ty as i32).abs();
-            //moved.points += incr;
+            moved.points += incr;
             //points += incr;
+        } else if moved.id == 'n' {
+            let mut incr = 2;
+            if ty == 0 || ty == 7 {
+                incr -= 2;
+            }
+            if tx == 0 || tx == 7 {
+                incr -= 2;
+            }
+            //println!("incr {} old {}", incr, (moved.points - Piece::VALUE_KNIGHT));
+            points += incr - (moved.points - Piece::VALUE_KNIGHT);
+            moved.points = Piece::VALUE_KNIGHT + incr;
         } else if moved.id == 'r' {
             if tx == 0 || tx == 7 {
                 match moved.color {
@@ -346,6 +306,11 @@ impl Board {
                 }
             }
         }
+
+        //move piece
+        self.pieces[ty][tx] = Some(moved);
+        self.pieces[fy][fx] = None;
+
         points *= if moved.color == Color::White { 1 } else { -1 };
         self.curr_points += points;
         (points, moved, taken, promoted, castle_data)
@@ -378,16 +343,15 @@ impl Board {
                 Color::Black => self.king_black = *from,
             }
         }
+        //no need to influence points here - they are stored in points var
         match castle_data {
             CastleMoveData::Kingside => {
                 self.pieces[from.y as usize][7] = self.pieces[to.y as usize][5];
                 self.pieces[from.y as usize][5] = None;
-                self.curr_points -= 3;
             }
             CastleMoveData::Queenside => {
                 self.pieces[from.y as usize][0] = self.pieces[to.y as usize][3];
                 self.pieces[from.y as usize][3] = None;
-                self.curr_points -= 2;
             }
             CastleMoveData::None => {}
         }
@@ -474,28 +438,29 @@ impl Board {
             Color::White => &mut backward_y as &mut dyn Iterator<Item = usize>,
             Color::Black => &mut forward_y as &mut dyn Iterator<Item = usize>,
         } {
-            print!("+---+---+---+---+---+---+---+---+\n");
+            //println!("+---+---+---+---+---+---+---+---+");
             let mut forward_x = 0usize..8;
             let mut backward_x = (0usize..8).rev();
             for x in match perspective {
                 Color::White => &mut forward_x as &mut dyn Iterator<Item = usize>,
                 Color::Black => &mut backward_x as &mut dyn Iterator<Item = usize>,
             } {
-                print!("|");
-                let highlight_color = if (self.highlight_move.0.x == x as u8
-                    && self.highlight_move.0.y == y as u8)
-                    || (self.highlight_move.1.x == x as u8 && self.highlight_move.1.y == y as u8)
-                {
-                    "\x1b[1;103m"
-                } else if moves.iter().any(|v| {
+                //print!("|");
+                let highlight_color = if (self.highlight_move.0.x == x as u8 && self.highlight_move.0.y == y as u8)
+                    || (self.highlight_move.1.x == x as u8 && self.highlight_move.1.y == y as u8) {
+                    "\x1b[1;48;5;11;38;5;0m"
+                } else if moves.iter().any(|v| 
                     v.1 == Square {
                         x: x as u8,
                         y: y as u8,
                     }
-                }) {
+                ) {
                     "\x1b[1;42m"
                 } else {
-                    ""
+                    match (x+y)%2 {
+                        0 => "\x1b[1;48;5;7;38;5;0m",
+                        _ => "\x1b[1;48;5;6;38;5;0m"
+                    }
                 };
                 if let Some(piece) = self.pieces[y][x] {
                     print!(
@@ -511,13 +476,13 @@ impl Board {
                     print!("{}   \x1b[0m", highlight_color);
                 }
             }
-            print!("| {}\n", y + 1);
+            print!(" {}\n", y + 1);
         }
         print!(
-            "+---+---+---+---+---+---+---+---+\n  {}\n",
+            " {}\n",
             match perspective {
-                Color::White => "a   b   c   d   e   f   g   h",
-                Color::Black => "h   g   f   e   d   c   b   a",
+                Color::White => "a  b  c  d  e  f  g  h",
+                Color::Black => "h  g  f  e  d  c  b  a",
             }
         );
         println!();

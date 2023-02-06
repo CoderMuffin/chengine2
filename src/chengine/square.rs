@@ -9,16 +9,15 @@ pub struct Square {
 impl Square {
     pub fn new(square: &str) -> Option<Square> {
         let mut str_iter = square.chars();
-        let range_check = |x| {
-            if x < 8 {
-                Some(x as u8)
-            } else {
-                None
-            }
-        };
         Some(Square {
-            x: range_check(str_iter.next()? as u32 - 97)?,
-            y: range_check(str_iter.next()? as u32 - 49)?,
+            x: (match str_iter.next()? {
+                x @ 'a'..='h' => x as u32,
+                _ => return None
+            } - 97) as u8,
+            y: (match str_iter.next()? {
+                x @ '1'..='8' => x as u32,
+                _ => return None
+            } - 49) as u8,
         })
     }
     pub fn disp(&self) -> String {

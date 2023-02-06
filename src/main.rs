@@ -28,6 +28,18 @@ fn input_move(
         } else {
             board.highlight_piece = None;
         }
+        if from.starts_with("!") {
+            if let Some(sq) = Square::new(&from[1..]) {
+                if let Some(piece) = board.piece_at(&sq) {
+                    println!("Value of {} color {:?}: {}", piece.id, piece.color, piece.points);
+                } else {
+                    println!("No piece on square");
+                }
+            } else {
+                println!("Cannot get moves for {}", &from[1..]);
+            }
+            continue;
+        }
         stdin.read_line(&mut to)?;
         let (fromsq, tosq) = match (Square::new(&from), Square::new(&to)) {
             (Some(a), Some(b)) => (a, b),
@@ -79,7 +91,7 @@ impl StdinExtension for std::io::Stdin {
 // }
 
 fn main() -> std::io::Result<()> {
-    let depth = 5;
+    let depth = 6;
     let mut board = Board::new();
     let mut current_color = Color::White;
     let stdin = std::io::stdin();

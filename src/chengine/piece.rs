@@ -9,20 +9,27 @@ pub struct Piece {
 }
 
 impl Piece {
+    pub const VALUE_KING: i32 = 99999;
+    pub const VALUE_QUEEN: i32 = 850;
+    pub const VALUE_ROOK: i32 = 500;
+    pub const VALUE_BISHOP: i32 = 350;
+    pub const VALUE_KNIGHT: i32 = 300;
+    pub const VALUE_PAWN: i32 = 100;
+    
     pub fn new(id: char, color: Color) -> Piece {
         Piece {
             id: id,
             color: color,
             has_moved: false,
             points: match id {
-                'k' => 99999,
-                'q' => 850,
-                'r' => 500,
-                'b' => 350,
-                'n' => 300,
-                'p' => 100,
-                _ => panic!("Invalid piece '{}'", id),
-            },
+                'k' => Self::VALUE_KING,
+                'q' => Self::VALUE_QUEEN,
+                'r' => Self::VALUE_ROOK,
+                'b' => Self::VALUE_BISHOP,
+                'n' => Self::VALUE_KNIGHT,
+                'p' => Self::VALUE_PAWN,
+                _ => panic!("Invalid piece '{}'", id)
+            }
         }
     }
 
