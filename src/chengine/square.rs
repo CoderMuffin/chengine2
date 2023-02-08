@@ -12,11 +12,11 @@ impl Square {
         Some(Square {
             x: (match str_iter.next()? {
                 x @ 'a'..='h' => x as u32,
-                _ => return None
+                _ => return None,
             } - 97) as u8,
             y: (match str_iter.next()? {
                 x @ '1'..='8' => x as u32,
-                _ => return None
+                _ => return None,
             } - 49) as u8,
         })
     }

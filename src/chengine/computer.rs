@@ -60,25 +60,29 @@ impl Computer {
             alpha = stand_pat;
         }
         for (from, to) in board.get_moves(curr_color) {
-            if !board.occupied(&to) { //should be faster than retain, maybe bench this?
+            if !board.occupied(&to) {
+                //should be faster than retain, maybe bench this?
                 continue;
             }
             let move_data = board.exec_move(&from, &to);
             let score = -Self::quiescence(board, !curr_color, -beta, -alpha);
             board.unexec_move(&from, &to, move_data);
-    
+
             if score >= beta {
                 return beta;
             }
             if score > alpha {
-               alpha = score;
+                alpha = score;
             }
         }
         return alpha;
     }
 
     fn move_sort(board: &Board, a: &(Square, Square), b: &(Square, Square)) -> std::cmp::Ordering {
-        board.square_value(&b.1).partial_cmp(&board.square_value(&a.1)).unwrap()
+        board
+            .square_value(&b.1)
+            .partial_cmp(&board.square_value(&a.1))
+            .unwrap()
     }
 
     fn negamax(board: &mut Board, curr_color: Color, mut alpha: f32, beta: f32, depth: u8) -> f32 {
@@ -95,9 +99,9 @@ impl Computer {
             if score > best {
                 best = score;
             }
-            
+
             //this has to come before the break as the board is shared state
-            board.unexec_move(&from, &to, move_data); 
+            board.unexec_move(&from, &to, move_data);
             if best > alpha {
                 alpha = best;
                 if alpha >= beta {
@@ -127,7 +131,7 @@ impl Computer {
             if score > best.0 {
                 best = (score, Some((from, to)));
             }
-            
+
             if best.0 > alpha {
                 alpha = best.0;
                 if alpha >= beta {
@@ -140,7 +144,7 @@ impl Computer {
 
     pub fn get_next_from_opening(
         &mut self,
-        maybe_last_move: Option<(Square, Square)>,
+        maybe_last_move: &Option<(Square, Square)>,
     ) -> Option<(Square, Square)> {
         if self.seek_opening == self.curr_opening.moves.len() {
             match maybe_last_move {
@@ -151,14 +155,14 @@ impl Computer {
                     } else {
                         self.curr_opening = &self.curr_opening.next[0];
                         self.seek_opening = 0;
-                        return self.get_next_from_opening(None);
+                        return self.get_next_from_opening(&None);
                     }
                 }
                 Some(last_move) => {
                     //their go
                     let mut found_opening = false;
                     for opening in &self.curr_opening.next {
-                        if opening.moves[0] == last_move {
+                        if opening.moves[0] == *last_move {
                             self.curr_opening = opening;
                             found_opening = true;
                             break;
@@ -166,7 +170,7 @@ impl Computer {
                     }
                     if found_opening {
                         self.seek_opening = 1; //skip opponent move, NOTE = 1 NOT += 1
-                        return self.get_next_from_opening(None);
+                        return self.get_next_from_opening(&None);
                     } else {
                         return None;
                     }
@@ -177,9 +181,9 @@ impl Computer {
                 None => return Some(self.curr_opening.moves[self.seek_opening]), //my go
                 Some(last_move) => {
                     //their go
-                    if self.curr_opening.moves[self.seek_opening] == last_move {
+                    if self.curr_opening.moves[self.seek_opening] == *last_move {
                         self.seek_opening += 1;
-                        return self.get_next_from_opening(None);
+                        return self.get_next_from_opening(&None);
                     } else {
                         return None;
                     }
@@ -191,7 +195,7 @@ impl Computer {
     pub fn get_move(
         &mut self,
         board: &Board,
-        maybe_last_move: Option<(Square, Square)>,
+        maybe_last_move: &Option<(Square, Square)>,
         depth: u8,
     ) -> (f32, (Square, Square)) {
         if self.following_opening {
@@ -213,7 +217,7 @@ impl Computer {
                 //let b0 = b[0];
                 //println!("{} {:?}", a, b.into_iter().map(|x| (x.0.disp(), x.1.disp())).collect::<Vec<_>>());
                 (a, b)
-            },
+            }
             _ => panic!(),
         }
     }

@@ -1,6 +1,8 @@
 use crate::chengine::*;
 use std::fmt;
 
+pub type MoveData = (i32, Piece, Option<Piece>, bool, CastleMoveData);
+
 #[derive(Clone)]
 pub struct CastleInfo {
     pub kingside: bool,
@@ -157,6 +159,17 @@ impl Board {
         fen
     }
 
+    pub fn positional_value(id: char, sq: &Square) -> i32 {
+        let mut incr = 3;
+        if sq.y == 0 || sq.y == 7 {
+            incr -= 3;
+        }
+        if sq.x == 0 || sq.x == 7 {
+            incr -= 3;
+        }
+        incr
+    }
+
     pub fn occupied(&self, square: &Square) -> bool {
         self.pieces[square.y as usize][square.x as usize].is_some()
     }
@@ -171,7 +184,7 @@ impl Board {
     pub fn square_value(&self, square: &Square) -> i32 {
         match self.pieces[square.y as usize][square.x as usize] {
             Some(piece) => piece.points,
-            None => 0
+            None => 0,
         }
     }
 
@@ -201,11 +214,7 @@ impl Board {
         }
     }
 
-    pub fn exec_move(
-        &mut self,
-        from: &Square,
-        to: &Square,
-    ) -> (i32, Piece, Option<Piece>, bool, CastleMoveData) {
+    pub fn exec_move(&mut self, from: &Square, to: &Square) -> MoveData {
         let tx = to.x as usize;
         let ty = to.y as usize;
         let fx = from.x as usize;
@@ -274,14 +283,14 @@ impl Board {
         } else if moved.id == 'p' {
             let incr = (fy as i32 - ty as i32).abs();
             moved.points += incr;
-            //points += incr;
+            points += incr;
         } else if moved.id == 'n' {
-            let mut incr = 2;
+            let mut incr = 3;
             if ty == 0 || ty == 7 {
-                incr -= 2;
+                incr -= 3;
             }
             if tx == 0 || tx == 7 {
-                incr -= 2;
+                incr -= 3;
             }
             //println!("incr {} old {}", incr, (moved.points - Piece::VALUE_KNIGHT));
             points += incr - (moved.points - Piece::VALUE_KNIGHT);
@@ -320,21 +329,17 @@ impl Board {
         &mut self,
         from: &Square,
         to: &Square,
-        (points, moved, taken, promoted, castle_data): (
-            i32,
-            Piece,
-            Option<Piece>,
-            bool,
-            CastleMoveData,
-        ),
+        (points, moved, taken, promoted, castle_data): MoveData,
     ) {
+        let fx = from.x as usize;
+        let fy = from.y as usize;
         if taken.is_some() {
             self.piece_count += 1;
         }
         if promoted {
-            self.pieces[from.y as usize][from.x as usize] = Some(Piece::new('p', moved.color))
+            self.pieces[fy][fx] = Some(Piece::new('p', moved.color))
         } else {
-            self.pieces[from.y as usize][from.x as usize] = Some(moved);
+            self.pieces[fy][fx] = Some(moved);
         }
         self.pieces[to.y as usize][to.x as usize] = taken;
         if moved.id == 'k' {
@@ -342,16 +347,29 @@ impl Board {
                 Color::White => self.king_white = *from,
                 Color::Black => self.king_black = *from,
             }
+        } else if moved.id == 'n' {
+            let mut incr = 3;
+            if fy == 0 || fy == 7 {
+                incr -= 3;
+            }
+            if fx == 0 || fx == 7 {
+                incr -= 3;
+            }
+            //println!("incr {} old {}", incr, (moved.points - Piece::VALUE_KNIGHT));
+            //points += incr - (moved.points - Piece::VALUE_KNIGHT);
+            self.pieces[fy][fx].as_mut().unwrap().points = Piece::VALUE_KNIGHT + incr;
+        } else if moved.id == 'p' {
+            self.pieces[fy][fx].as_mut().unwrap().points -= (fy as i32 - to.y as i32).abs()
         }
         //no need to influence points here - they are stored in points var
         match castle_data {
             CastleMoveData::Kingside => {
-                self.pieces[from.y as usize][7] = self.pieces[to.y as usize][5];
-                self.pieces[from.y as usize][5] = None;
+                self.pieces[fy][7] = self.pieces[to.y as usize][5];
+                self.pieces[fy][5] = None;
             }
             CastleMoveData::Queenside => {
-                self.pieces[from.y as usize][0] = self.pieces[to.y as usize][3];
-                self.pieces[from.y as usize][3] = None;
+                self.pieces[fy][0] = self.pieces[to.y as usize][3];
+                self.pieces[fy][3] = None;
             }
             CastleMoveData::None => {}
         }
@@ -446,20 +464,22 @@ impl Board {
                 Color::Black => &mut backward_x as &mut dyn Iterator<Item = usize>,
             } {
                 //print!("|");
-                let highlight_color = if (self.highlight_move.0.x == x as u8 && self.highlight_move.0.y == y as u8)
-                    || (self.highlight_move.1.x == x as u8 && self.highlight_move.1.y == y as u8) {
+                let highlight_color = if (self.highlight_move.0.x == x as u8
+                    && self.highlight_move.0.y == y as u8)
+                    || (self.highlight_move.1.x == x as u8 && self.highlight_move.1.y == y as u8)
+                {
                     "\x1b[1;48;5;11;38;5;0m"
-                } else if moves.iter().any(|v| 
+                } else if moves.iter().any(|v| {
                     v.1 == Square {
                         x: x as u8,
                         y: y as u8,
                     }
-                ) {
+                }) {
                     "\x1b[1;42m"
                 } else {
-                    match (x+y)%2 {
+                    match (x + y) % 2 {
                         0 => "\x1b[1;48;5;7;38;5;0m",
-                        _ => "\x1b[1;48;5;6;38;5;0m"
+                        _ => "\x1b[1;48;5;6;38;5;0m",
                     }
                 };
                 if let Some(piece) = self.pieces[y][x] {

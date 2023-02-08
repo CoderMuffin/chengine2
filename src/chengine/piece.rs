@@ -15,7 +15,7 @@ impl Piece {
     pub const VALUE_BISHOP: i32 = 350;
     pub const VALUE_KNIGHT: i32 = 300;
     pub const VALUE_PAWN: i32 = 100;
-    
+
     pub fn new(id: char, color: Color) -> Piece {
         Piece {
             id: id,
@@ -28,8 +28,8 @@ impl Piece {
                 'b' => Self::VALUE_BISHOP,
                 'n' => Self::VALUE_KNIGHT,
                 'p' => Self::VALUE_PAWN,
-                _ => panic!("Invalid piece '{}'", id)
-            }
+                _ => panic!("Invalid piece '{}'", id),
+            },
         }
     }
 

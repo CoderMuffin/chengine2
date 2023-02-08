@@ -3,60 +3,78 @@
 mod chengine;
 use crate::chengine::*;
 
+static DEPTH: u8 = 5;
 static PERSPECTIVE: Color = Color::Black;
+
+enum InputResult {
+    Move((Square, Square)),
+    Undo,
+    NoChange
+}
+use InputResult::*;
 
 fn input_move(
     board: &mut Board,
     color: Color,
     stdin: &std::io::Stdin,
-) -> std::io::Result<(Square, Square)> {
-    let mut from;
-    let mut to;
-    loop {
-        from = String::new();
-        to = String::new();
-        stdin.read_line(&mut from)?;
-        if from.starts_with("?") {
-            if let Some(sq) = Square::new(&from[1..]) {
-                board.highlight_piece = Some(sq);
-                board.display(PERSPECTIVE);
-                continue;
-            } else {
-                println!("Cannot get moves for {}", &from[1..]);
-                continue;
-            }
-        } else {
-            board.highlight_piece = None;
+    last_move: &Option<(Square, Square)>,
+    computers: (&mut Computer, &mut Computer),
+    moves: &mut Vec<(Square, Square, MoveData)>,
+) -> Option<InputResult> {
+    board.display(PERSPECTIVE);
+    let mut line_buf = String::new();
+    stdin.read_line(&mut line_buf).ok()?;
+    let mut iter = line_buf.split(" ");
+    match iter.next()?.trim() {
+        "go" => {
+            let now = std::time::Instant::now();
+            let to_move = match color {
+                Color::White => computers.0.get_move(board, last_move, DEPTH),
+                Color::Black => computers.1.get_move(board, last_move, DEPTH),
+            };
+            println!(
+                "Found move\nMinimum value: {}\nDepth: {}\nTime: {:.2?}",
+                to_move.0,
+                DEPTH,
+                now.elapsed()
+            );
+            moves.push((
+                to_move.1 .0,
+                to_move.1 .1,
+                board.exec_move(&to_move.1 .0, &to_move.1 .1),
+            ));
+            board.highlight_move = to_move.1;
+            Some(Move(to_move.1))
         }
-        if from.starts_with("!") {
-            if let Some(sq) = Square::new(&from[1..]) {
-                if let Some(piece) = board.piece_at(&sq) {
-                    println!("Value of {} color {:?}: {}", piece.id, piece.color, piece.points);
-                } else {
-                    println!("No piece on square");
-                }
-            } else {
-                println!("Cannot get moves for {}", &from[1..]);
-            }
-            continue;
-        }
-        stdin.read_line(&mut to)?;
-        let (fromsq, tosq) = match (Square::new(&from), Square::new(&to)) {
-            (Some(a), Some(b)) => (a, b),
-            _ => {
-                println!("Invalid");
-                board.display(PERSPECTIVE);
-                continue;
-            }
-        };
+        "move" => {
+            let from = Square::new(iter.next()?.trim())?;
+            let to = Square::new(iter.next()?.trim())?;
 
-        let mut moves = board.get_moves(color);
-        board.filter_checks(&mut moves, color);
-        if moves.iter().any(|x| *x == (fromsq, tosq)) {
-            return Ok((fromsq, tosq));
+            let mut valid_moves = board.get_moves(color);
+            board.filter_checks(&mut valid_moves, color);
+            if valid_moves.iter().any(|x| *x == (from, to)) {
+                moves.push((from, to, board.exec_move(&from, &to)));
+                board.highlight_move = (from, to);
+                Some(Move((from, to)))
+            } else {
+                None
+            }
         }
-        println!("Invalid");
-        board.display(PERSPECTIVE);
+        "query" => {
+            let sq = Square::new(iter.next()?.trim())?;
+            board.highlight_piece = Some(sq);
+
+            Some(NoChange)
+        }
+        "undo" => {
+            if let Some(old_move) = moves.pop() {
+                board.unexec_move(&old_move.0, &old_move.1, old_move.2);
+                Some(Undo)
+            } else {
+                Some(NoChange)
+            }
+        }
+        _ => None,
     }
 }
 
@@ -72,104 +90,54 @@ impl StdinExtension for std::io::Stdin {
     }
 }
 
-// fn board_damage_minification() -> Board {
-//     let mut pieces = [[None; 8]; 8];
-//     pieces[7][7] = Some(Piece::new('k', Color::White));
-//     pieces[2][1] = Some(Piece::new('k', Color::Black));
-//     pieces[1][1] = Some(Piece::new('p', Color::Black));
-//     pieces[1][2] = Some(Piece::new('r', Color::White));
-//     pieces[2][2] = Some(Piece::new('n', Color::White));
-//     Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
-// }
-
-// fn board_rook_checkmate() -> Board {
-//     let mut pieces = [[None; 8]; 8];
-//     pieces[7][7] = Some(Piece::new('k', Color::White));
-//     pieces[2][1] = Some(Piece::new('k', Color::Black));
-//     pieces[1][2] = Some(Piece::new('r', Color::White));
-//     Board::from(pieces, Square { x: 7, y: 7 }, Square { x: 1, y: 2 })
-// }
-
 fn main() -> std::io::Result<()> {
-    let depth = 6;
     let mut board = Board::new();
     let mut current_color = Color::White;
     let stdin = std::io::stdin();
-    let mut computer1 = Computer::new(Color::White, &OPENING_BOOK);
-    let mut computer2 = Computer::new(Color::Black, &OPENING_BOOK);
-    computer1.following_opening = true;
-    computer2.following_opening = false;
-    //computer.following_opening = false;
     let mut last_move = None;
-    //board.exec_move(&Square::new("e2").unwrap(), &Square::new("e4").unwrap());
-    //board.exec_move(&Square::new("e7").unwrap(), &Square::new("e5").unwrap());
-    // board.exec_move(&Square::new("d8"), &Square::new("e4"));
-    // board.exec_move(&Square::new("d1"), &Square::new("d4"));
-    // board.exec_move(&Square::new("h1"), &Square::new("f5"));
-    //let rng = &mut rand::thread_rng();
-    board.display(PERSPECTIVE);
-    //println!("{}", board.fen(Color::White));
 
-    // let mut pieces = [[None; 8]; 8];
-    // pieces[0][3] = Some(Piece::new('k', Color::Black));
-    // pieces[4][3] = Some(Piece::new('q', Color::Black));
-    // pieces[6][3] = Some(Piece::new('b', Color::White));
-    // pieces[7][3] = Some(Piece::new('r', Color::White));
-    // pieces[7][4] = Some(Piece::new('k', Color::White));
-    // println!("{}", Board::from(pieces, Square { x: 4, y: 7 }, Square { x: 3, y: 0 }).fen());
+    let mut moves = Vec::new();
+    let mut computer_white: Computer = Computer::new(Color::White, &OPENING_BOOK);
+    let mut computer_black: Computer = Computer::new(Color::Black, &OPENING_BOOK);
+
     loop {
-        //println!("{:?}",pieces);
-        // let mut moves = Vec::new();
-        // let mut piece = &(Square { x: 16, y: 16 }, Piece::new('q', Color::White));
-        // while moves.len() == 0 {
-        //     piece = pieces.choose(rng).unwrap();
-        //     moves = piece.1.get_moves(&board, piece.0);
-        // }
-        //println!("{:?}", moves);
+        match input_move(
+            &mut board,
+            current_color,
+            &stdin,
+            &last_move,
+            (&mut computer_white, &mut computer_black),
+            &mut moves,
+        ) {
+            Some(Move(new_move)) => {
+                    println!(
+                    "Move: {} to {}\nEval (+white, -black): {}\nWhite in check: {}\nBlack in check: {}",
+                    new_move.0,
+                    new_move.1,
+                    board.eval(Color::White),
+                    board.king_in_check(Color::White),
+                    board.king_in_check(Color::Black),
+                );
 
-        // let now = std::time::Instant::now();
-        // let best = match current_color {
-        //     Color::White => &mut computer1,
-        //     Color::Black => &mut computer2
-        // }.get_move(&board, last_move, depth);
-        // println!("Found move\nMinimum value: {}\nDepth: {}\nTime: {:.2?}", best.0, depth, now.elapsed());
-        // last_move = Some(best.1);
-        if current_color == Color::White {
-            let now = std::time::Instant::now();
-            let best = computer1.get_move(&board, last_move, depth);
-            println!(
-                "Found move\nMinimum value: {}\nDepth: {}\nTime: {:.2?}",
-                best.0,
-                depth,
-                now.elapsed()
-            );
-            last_move = Some(best.1);
-        } else {
-            last_move = Some(input_move(&mut board, current_color, &stdin)?);
+                last_move = Some(new_move);
+
+                if board.eval(Color::White) == CHECKMATE {
+                    println!("White wins");
+                    break;
+                } else if board.eval(Color::Black) == CHECKMATE {
+                    println!("Black wins");
+                    break;
+                }
+                current_color = !current_color;
+            },
+            Some(Undo) => {
+                current_color = !current_color;
+            }
+            Some(NoChange) => {},
+            None => {
+                println!("Error");
+            }
         }
-        let (from, to) = last_move.unwrap();
-        board.exec_move(&from, &to);
-        board.highlight_move = (from, to);
-        //stdin.wait_for_enter()?;
-        //board.exec_move(&piece.0, moves.choose(rng).unwrap());
-        println!(
-            "Move: {} to {}\nEval (+white, -black): {}\nWhite in check: {}\nBlack in check: {}\nUsing opening book: {}",
-            from, to,
-            board.eval(Color::White),
-            board.king_in_check(Color::White),
-            board.king_in_check(Color::Black),
-            computer1.following_opening
-        );
-        board.display(PERSPECTIVE);
-        if board.eval(Color::White) == CHECKMATE {
-            println!("White wins");
-            break;
-        } else if board.eval(Color::Black) == CHECKMATE {
-            println!("Black wins");
-            break;
-        }
-        current_color = !current_color;
-        //stdin.wait_for_enter()?;
     }
     Ok(())
 }
